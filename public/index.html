@@ -86,11 +86,14 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:va
 .nx .run i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--alert);margin-right:5px;vertical-align:1px}
 @media (max-width:360px){.nowcard{grid-template-columns:1fr}.nx{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:10px}}
 .brand{position:relative}
+.setbtn{align-self:center;display:inline-flex;align-items:center;gap:8px;padding:10px 16px;min-height:44px;border-radius:12px;color:var(--muted);font-weight:700;font-size:.9rem;margin-top:8px}
+.setbtn svg{width:18px;height:18px}
+.setbtn:hover{color:var(--mint)}
 .gear{position:absolute;top:0;right:0;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line)}
 .gear svg{width:22px;height:22px}
 .gear:hover{color:var(--mint)}
 .wordmark{margin-top:8px}
-@media (max-width:420px){.wordmark{font-size:2.1rem;margin-top:52px}}
+@media (max-width:420px){.wordmark{font-size:2.1rem}}
 .set{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
 .set .row label{display:flex;align-items:center;gap:8px}
 .note{font-size:.85rem;color:var(--muted);background:var(--sunk);border-radius:12px;padding:12px 14px}
@@ -307,7 +310,7 @@ function go(p){ui.page=p;render();window.scrollTo(0,0)}
 function head(){
   const sync=`<span id="sync" class="sync${syncOk?" ok":""}"><i></i>${syncState}</span>`;
   if(ui.page==="home"){const h=new Date().getHours();
-    return `<div class="brand"><button class="gear" data-act="settings" aria-label="Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><div class="wordmark">AVANOR</div>
+    return `<div class="brand"><div class="wordmark">AVANOR</div>
       <div class="date">${h<11?"Guten Morgen":h<17?"Hallo":h<22?"Guten Abend":"Gute Nacht"}, Steve · ${esc(fmt(today(),{weekday:"long",day:"numeric",month:"long"}))}</div>${sync}</div>`}
   return `<div class="stack" style="gap:6px"><div class="subhead"><button class="back" data-act="home">‹ Start</button><span class="mini">AVANOR</span></div><h1>${PAGES[ui.page]}</h1>${sync}</div>`;
 }
@@ -448,7 +451,8 @@ function vHome(){
     <button class="tile" data-act="go" data-p="aufgaben">${ICON.aufgaben}<div><b>Tagesaufgaben</b><span>${tc.total?`${tc.done} von ${tc.total} erledigt`:"Noch keine Aufgaben"}</span></div></button>
     <button class="tile" data-act="go" data-p="training">${ICON.training}<div><b>Training</b><span>${trainedOn(s)?"Heute erledigt ✓":pl.length?"Heute: "+esc(pl.map(p=>p.title).join(", ")):"Heute Ruhetag"}</span></div></button>
     <button class="tile ${alerts.length?"warn":""}" data-act="go" data-p="vorrat">${ICON.vorrat}<div><b>Nasenpflaster &amp; Mundtapes</b><span>${supTxt}</span></div></button>
-  </nav>`;
+  </nav>
+  <button class="setbtn" data-act="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Einstellungen</button>`;
 }
 function pick(arr,n,seed){const a=[...arr];let h=0;for(const c of seed)h=(h*31+c.charCodeAt(0))>>>0;const out=[];while(a.length&&out.length<n){h=(h*1103515245+12345)>>>0;out.push(a.splice(h%a.length,1)[0])}return out}
 let ideaSeed=0;
