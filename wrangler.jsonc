@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "avanor-tagesplaner",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "durable_objects": { "bindings": [{ "name": "PLANNER", "class_name": "Planner" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Planner"] }],
+  "observability": { "enabled": true }
+}
