@@ -89,7 +89,7 @@ export function model(get,today){
     supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
       body:x.nights===0?"Sie haben keine mehr übrig.":`Noch ${x.left} Stück. Tippen Sie in der App auf „Ich habe bestellt“, dann ist Ruhe.`,btn:"Okay",until:mt+240}));
     const t=timed(s);
-    if(st.remind.on)t.filter(x=>st.remind.kinds.includes(x.kind)).forEach(x=>out.push({key:`r-${s}-${x.a}-${x.id}`,min:x.a-st.remind.before,
+    if(st.remind.on)t.filter(x=>st.remind.kinds.includes(x.kind)&&!(x.kind==="arbeit"&&st.work.on)).forEach(x=>out.push({key:`r-${s}-${x.a}-${x.id}`,min:x.a-st.remind.before,
       title:st.remind.before?`In ${st.remind.before} Min.: ${x.title}`:`Jetzt: ${x.title}`,body:"Gleich geht es los. Sind Sie bereit, Meister?",btn:"Bereit!",until:x.a+1}));
     if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
       title:"Meister, Zeit zur Arbeit loszufahren!",body:`Arbeitsbeginn um ${hm(x.a)}. Sind Sie bereit?`,btn:"Bin unterwegs!",until:x.a}));

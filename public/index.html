@@ -143,6 +143,8 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:va
 .check.done .ct{text-decoration:line-through;color:var(--muted)}
 .check.tr.done .box{background:var(--violet);border-color:var(--violet)}
 .ct{flex:1;min-width:0;overflow-wrap:anywhere}
+.tt{flex:none;width:44px;font-variant-numeric:tabular-nums;font-weight:700;font-size:.9rem;color:var(--mint)}
+.check.done .tt{color:var(--muted)}
 .ct small{display:block;color:var(--muted);font-size:.8rem}
 .progress{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
 .progress span{display:block;height:100%;background:var(--mint);border-radius:99px;transition:width .3s}
@@ -405,10 +407,10 @@ function settingsSheet(){
     <div class="set"><label class="row" style="gap:8px"><input type="checkbox" id="s-ron" ${st.remind.on?"checked":""}><b>Erinnerung „Sind Sie bereit?“</b></label>
       <label class="field"><span>Minuten vor dem Start</span><input type="number" id="s-before" min="0" max="120" inputmode="numeric" value="${st.remind.before}"></label>
       <span class="eyebrow">Für diese Einträge</span>
-      <div class="row">${ALL_KINDS.map(k=>`<label><input type="checkbox" id="s-k-${k}" ${st.remind.kinds.includes(k)?"checked":""}> ${KIND[k]}</label>`).join("")}</div></div>
+      <div class="row">${ALL_KINDS.filter(k=>k!=="arbeit").map(k=>`<label><input type="checkbox" id="s-k-${k}" ${st.remind.kinds.includes(k)?"checked":""}> ${KIND[k]}</label>`).join("")}</div></div>
     <div class="set"><label class="row" style="gap:8px"><input type="checkbox" id="s-won" ${st.work.on?"checked":""}><b>Losfahren zur Arbeit</b></label>
       <label class="field"><span>Minuten vor Arbeitsbeginn (Ihre Fahrzeit)</span><input type="number" id="s-wbefore" min="1" max="180" inputmode="numeric" value="${st.work.before}"></label>
-      <span class="muted" style="font-size:.85rem">Gilt automatisch für jeden Eintrag der Art „Arbeit“.</span></div>
+      <span class="muted" style="font-size:.85rem">Gilt automatisch für jeden Eintrag der Art „Arbeit“, statt der kurzen Erinnerung.</span></div>
     <button class="btn primary">Speichern</button>
     <details class="set"><summary><b>Daten aus der alten App übernehmen</b></summary>
       <div class="stack" style="margin-top:10px"><p class="muted" style="font-size:.88rem">Öffnen Sie die alte App bei Claude, tippen Sie dort im Zahnrad auf „Daten kopieren“ und fügen Sie den Text hier ein.</p>
@@ -464,13 +466,15 @@ function itemHtml(i){return `<button class="item ${i.kind}" data-act="edit" data
 
 function tasksHtml(s){
   const r=routinesOn(s), once=itemsOn(s).filter(i=>i.kind==="aufgabe"), {total,done}=taskCount(s);
+  // Eine Liste nach Uhrzeit, Aufgaben ohne Uhrzeit am Ende
+  const rows=[...r.map(t=>({id:t.id,act:"routine",title:t.title,time:t.time||"",done:isDone(s,t.id),sub:t.repeat==="daily"?"täglich":"wöchentlich"})),
+    ...once.map(i=>({id:i.id,act:"once",title:i.title,time:i.start||"",done:!!i.done,sub:"einmalig"}))]
+    .sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"));
   if(!total)return `<div class="empty">Keine Aufgaben für diesen Tag. Legen Sie unten Vorlagen an, die täglich oder wöchentlich wiederkommen, dann tauchen sie hier von selbst auf.</div>`;
   return `<div class="row between"><span class="muted">${done} von ${total} erledigt</span>${done===total?'<span style="color:var(--mint);font-weight:700">Alles geschafft!</span>':""}</div>
   <div class="progress"><span style="width:${Math.round(done/total*100)}%"></span></div>
-  <div class="card" style="padding:2px 14px">${r.map(t=>`<button class="check ${isDone(s,t.id)?"done":""}" data-act="routine" data-id="${t.id}" data-date="${s}">
-    <span class="box">✓</span><span class="ct">${esc(t.title)}<small>${t.repeat==="daily"?"täglich":"wöchentlich"}${t.time?" · "+esc(t.time):""}</small></span></button>`).join("")}
-  ${once.map(i=>`<button class="check ${i.done?"done":""}" data-act="once" data-id="${i.id}" data-date="${s}">
-    <span class="box">✓</span><span class="ct">${esc(i.title)}<small>einmalig${i.start?" · "+esc(i.start):""}</small></span></button>`).join("")}</div>`;
+  <div class="card" style="padding:2px 14px">${rows.map(x=>`<button class="check ${x.done?"done":""}" data-act="${x.act}" data-id="${x.id}" data-date="${s}">
+    <span class="box">✓</span><span class="tt">${x.time?esc(x.time):"–"}</span><span class="ct">${esc(x.title)}<small>${x.sub}</small></span></button>`).join("")}</div>`;
 }
 
 function timelineHtml(s){
@@ -527,7 +531,7 @@ function vKalender(){
 
 function vAufgaben(){
   const s=today(), list=templates();
-  const group=(rep,title,hint)=>{const g=list.filter(t=>t.repeat===rep);return `<div class="card stack" style="gap:2px"><div class="row between"><h3>${title}</h3><span class="muted" style="font-size:.82rem">${hint}</span></div>
+  const group=(rep,title,hint)=>{const g=list.filter(t=>t.repeat===rep).sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"));return `<div class="card stack" style="gap:2px"><div class="row between"><h3>${title}</h3><span class="muted" style="font-size:.82rem">${hint}</span></div>
     ${g.length?g.map(t=>`<div class="list-row"><span class="t" style="${t.active===false?"opacity:.5":""}">${esc(t.title)}<br><small class="muted">${rep==="weekly"?[...(t.days||[])].sort().map(d=>WD[d-1]).join(", "):""}${t.time?(rep==="weekly"?" · ":"")+esc(t.time):""}${t.active===false?" · pausiert":""}</small></span>
       <button class="btn small" data-act="tpl" data-id="${t.id}">Bearbeiten</button></div>`).join(""):`<p class="muted" style="margin:6px 0">Noch keine.</p>`}</div>`};
   return `<section><div class="row between"><h2>Heute</h2><div class="row" style="gap:6px"><button class="btn small" data-act="fromtpl" data-date="${s}">Aus Vorlage</button><button class="btn primary small" data-act="new" data-date="${s}" data-kind="aufgabe">+ Aufgabe</button></div></div>
@@ -685,7 +689,7 @@ document.addEventListener("submit",e=>{
   else if(f.dataset.form==="plan"){draft.title=$("#p-title").value.trim();if(!draft.title)return;if(!(draft.days||[]).length){toast("Bitte mindestens einen Wochentag wählen.");return}
     const l=plan();const i=l.findIndex(x=>x.id===draft.id);if(i>=0)l[i]=draft;else l.push(draft);Store.put("training",{plan:l});closeSheet();toast("Trainingsplan gespeichert")}
   else if(f.dataset.form==="settings"){const before=Math.max(0,Math.min(120,parseInt($("#s-before").value,10)||0));
-    Store.put("settings",{morning:{on:$("#s-mon").checked,time:$("#s-mtime").value||"08:30"},remind:{on:$("#s-ron").checked,before,kinds:ALL_KINDS.filter(k=>$("#s-k-"+k).checked)},
+    Store.put("settings",{morning:{on:$("#s-mon").checked,time:$("#s-mtime").value||"08:30"},remind:{on:$("#s-ron").checked,before,kinds:ALL_KINDS.filter(k=>k==="arbeit"||$("#s-k-"+k).checked)},
       work:{on:$("#s-won").checked,before:Math.max(1,Math.min(180,parseInt($("#s-wbefore").value,10)||20))}});
     closeSheet();toast("Einstellungen gespeichert");checkReminders()}
   else if(f.dataset.form==="idea"){const v=$("#newIdea").value.trim();if(v)Store.put("ideas",{list:[...ideas(),v]})}
