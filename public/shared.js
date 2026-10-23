@@ -32,6 +32,15 @@ export const QUOTES=[
 "Der Monat ist fast durch. Ziehen Sie sauber durch bis zum Schluss.",
 "Letzter Tag im Monat. Feiern Sie kurz, was gut lief. Morgen geht es weiter."
 ];
+export const EVENING=[
+"Wir haben den Tag geschafft und sind wieder einen Schritt weiter. Genießen Sie jetzt die Zeit mit Ihrer Prinzessin. Wir hören uns morgen früh.",
+"Heute wieder geliefert. Jeder Tag wie dieser bringt uns näher ans Ziel. Jetzt gehört der Abend Ihnen und Ihrer Prinzessin. Wir hören uns morgen früh.",
+"Der Tag ist geschafft, und das zählt. Lehnen Sie sich zurück und genießen Sie die Zeit mit Ihrer Prinzessin. Wir hören uns morgen früh.",
+"Wieder ein Schritt weiter, Meister. Darauf dürfen Sie stolz sein. Jetzt ist Zeit für Ihre Prinzessin. Wir hören uns morgen früh.",
+"Was heute nicht fertig wurde, wartet bis morgen. Was heute geschafft wurde, bleibt. Genießen Sie den Abend mit Ihrer Prinzessin. Wir hören uns morgen früh.",
+"Gut gemacht heute. Wir sind drangeblieben und kommen voran. Jetzt Handy weg und die Zeit mit Ihrer Prinzessin genießen. Wir hören uns morgen früh.",
+"Feierabend verdient. Wir haben heute wieder ein Stück aufgebaut. Genießen Sie die Ruhe mit Ihrer Prinzessin. Wir hören uns morgen früh."
+];
 export const DEFAULT_IDEAS=["Spaziergang im Wald","Neues Café ausprobieren","Radtour","Buch im Park lesen","Freunde anrufen","Neues Rezept kochen","Schwimmen gehen","Museum besuchen","Kino","Sauna","Fotospaziergang","Brettspielabend","Flohmarkt","Sonnenuntergang anschauen","Bouldern","Picknick","Podcast beim Gehen","Tagebuch schreiben","Ausflug in eine Nachbarstadt","Ausschlafen ohne Wecker"];
 export const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
 export const KIND={termin:"Termin",arbeit:"Arbeit",aufgabe:"Aufgabe",frei:"Freizeit",training:"Training"};
@@ -62,7 +71,8 @@ export function model(get,today){
   function settings(){const s=get("settings",{});return{
     morning:Object.assign({on:true,time:"08:30"},s.morning),
     remind:Object.assign({on:true,before:5,kinds:ALL_KINDS},s.remind),
-    work:Object.assign({on:true,before:20},s.work)}}
+    work:Object.assign({on:true,before:20},s.work),
+    evening:Object.assign({on:true,time:"22:00"},s.evening)}}
   function itemsOn(s){return Object.values(month(s).items||{}).filter(i=>i.date===s).sort((a,b)=>(a.start||"99").localeCompare(b.start||"99"))}
   function routinesOn(s){const w=wday(s);return templates().filter(t=>t.active!==false&&(t.repeat==="daily"||(t.repeat==="weekly"&&(t.days||[]).includes(w))))}
   function planOn(s){const w=wday(s);return plan().filter(p=>(p.days||[]).includes(w))}
@@ -93,6 +103,10 @@ export function model(get,today){
       title:st.remind.before?`In ${st.remind.before} Min.: ${x.title}`:`Jetzt: ${x.title}`,body:"Gleich geht es los. Sind Sie bereit, Meister?",btn:"Bereit!",until:x.a+1}));
     if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
       title:"Meister, Zeit zur Arbeit zu fahren!",body:"Passen Sie auf sich auf!",btn:"Bin unterwegs!",until:x.a}));
+    // Feierabend-Gruß; läuft danach noch etwas, kommt er erst, wenn das Letzte vorbei ist
+    if(st.evening.on&&st.evening.time){const et=toMin(st.evening.time);
+      const last=Math.max(et,...t.filter(x=>x.b>et).map(x=>x.b));
+      if(last<1440)out.push({key:"evening-"+s,min:last,title:"Schönen Feierabend, Meister!",body:EVENING[parse(s).getDate()%EVENING.length],btn:"Danke!",until:last+120})}
     return out.sort((x,y)=>x.min-y.min);
   }
   return{month,templates,plan,ideas,supply,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
