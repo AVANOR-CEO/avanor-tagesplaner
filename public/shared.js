@@ -92,7 +92,7 @@ export function model(get,today){
     if(st.remind.on)t.filter(x=>st.remind.kinds.includes(x.kind)&&!(x.kind==="arbeit"&&st.work.on)).forEach(x=>out.push({key:`r-${s}-${x.a}-${x.id}`,min:x.a-st.remind.before,
       title:st.remind.before?`In ${st.remind.before} Min.: ${x.title}`:`Jetzt: ${x.title}`,body:"Gleich geht es los. Sind Sie bereit, Meister?",btn:"Bereit!",until:x.a+1}));
     if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
-      title:"Meister, Zeit zur Arbeit loszufahren!",body:`Arbeitsbeginn um ${hm(x.a)}. Sind Sie bereit?`,btn:"Bin unterwegs!",until:x.a}));
+      title:"Meister, Zeit zur Arbeit zu fahren!",body:"Passen Sie auf sich auf!",btn:"Bin unterwegs!",until:x.a}));
     return out.sort((x,y)=>x.min-y.min);
   }
   return{month,templates,plan,ideas,supply,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
