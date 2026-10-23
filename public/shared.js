@@ -1,36 +1,36 @@
 // Gemeinsame Logik für App (Browser) und Server (Cloudflare Worker)
 export const QUOTES=[
-"Neuer Monat, neues Kapitel. Steve, schreib heute die erste Zeile.",
+"Neuer Monat, neues Kapitel, Meister. Schreiben Sie heute die erste Zeile.",
 "Heute zählt nicht perfekt. Heute zählt: angefangen.",
 "Gute Nächte machen gute Tage. Pflaster drauf, Mund zu, Kopf aus.",
-"Wer frei atmet, denkt klarer. Nimm dir heute einen tiefen Atemzug, bevor du loslegst.",
-"Dein Kalender gehört dir. Nicht den anderen.",
-"Mach zuerst das, was du am liebsten verschieben würdest. Danach ist der Tag leicht.",
+"Wer frei atmet, denkt klarer. Nehmen Sie einen tiefen Atemzug, bevor Sie loslegen.",
+"Ihr Kalender gehört Ihnen, Meister. Nicht den anderen.",
+"Erledigen Sie zuerst, was Sie am liebsten verschieben würden. Danach ist der Tag leicht.",
 "Disziplin heißt nur: sich erinnern, was man wirklich will.",
-"Heute wird nicht verhandelt. Heute wird gemacht.",
-"Kleine Häkchen, große Wirkung. Hak heute ab, was du dir vorgenommen hast.",
-"Pause ist kein Stillstand. Plan heute bewusst Zeit nur für dich ein.",
-"Ein Training, das du machst, schlägt jedes perfekte, das du nur planst.",
-"Du musst nicht motiviert sein, um anzufangen. Die Motivation kommt beim Machen.",
+"Heute wird nicht verhandelt, Meister. Heute wird gemacht.",
+"Kleine Häkchen, große Wirkung. Haken Sie heute ab, was Sie sich vorgenommen haben.",
+"Pause ist kein Stillstand. Planen Sie heute bewusst Zeit nur für sich ein.",
+"Ein Training, das Sie machen, schlägt jedes perfekte, das Sie nur planen.",
+"Sie müssen nicht motiviert sein, um anzufangen. Die Motivation kommt beim Machen.",
 "Zähne putzen, Wasser trinken, rausgehen. Manche Siege sind leise.",
-"AVANOR gibt es, weil du etwas besser machen wolltest. Mach heute dasselbe mit deinem Tag.",
-"Halbzeit im Monat. Schau kurz zurück, was du geschafft hast, und leg eine Schippe drauf.",
+"AVANOR gibt es, weil Sie etwas besser machen wollten. Machen Sie heute dasselbe mit Ihrem Tag.",
+"Halbzeit im Monat, Meister. Schauen Sie kurz zurück und legen Sie eine Schippe drauf.",
 "Erledigt ist besser als perfekt.",
-"Du wachst nicht jeden Tag motiviert auf. Aber du wachst jeden Tag mit einer Wahl auf.",
-"Weniger scrollen, mehr leben. Heute zählt, was du erlebst.",
+"Nicht jeder Morgen beginnt motiviert. Aber jeder Morgen beginnt mit einer Wahl.",
+"Weniger scrollen, mehr leben. Heute zählt, was Sie erleben.",
 "Wer seinen Tag plant, muss ihm nicht hinterherlaufen.",
-"Sei heute der Grund, warum du morgen stolz auf dich bist.",
+"Seien Sie heute der Grund, warum Sie morgen stolz auf sich sind.",
 "Ruhig atmen, klar bleiben, weitermachen.",
-"Der schwerste Schritt ist der von der Couch zur Tür. Danach läuft's.",
-"Nicht jeder Tag ist gut. Aber in jedem steckt etwas Gutes. Such es dir.",
-"Du hast schon härtere Tage geschafft als diesen.",
-"Mach heute etwas, das dein Ich von morgen feiert.",
+"Der schwerste Schritt ist der von der Couch zur Tür. Danach läuft es.",
+"Nicht jeder Tag ist gut. Aber in jedem steckt etwas Gutes. Finden Sie es, Meister.",
+"Sie haben schon härtere Tage gemeistert als diesen, Meister.",
+"Tun Sie heute etwas, das Ihr Ich von morgen feiert.",
 "Konstanz schlägt Talent. Jeden einzelnen Tag.",
-"Freizeit ist kein Rest vom Tag, sondern Teil vom Plan. Block sie dir.",
+"Freizeit ist kein Rest vom Tag, sondern Teil vom Plan. Blocken Sie sie sich.",
 "Fokus heißt auch Nein sagen. Zu allem, was heute nicht wichtig ist.",
-"Bleib dran, Steve. Gerade dann, wenn's keiner sieht.",
-"Der Monat ist fast durch. Zieh sauber durch bis zum Schluss.",
-"Letzter Tag im Monat. Feier kurz, was gut lief, und morgen geht's weiter."
+"Bleiben Sie dran, Meister. Gerade dann, wenn es keiner sieht.",
+"Der Monat ist fast durch. Ziehen Sie sauber durch bis zum Schluss.",
+"Letzter Tag im Monat. Feiern Sie kurz, was gut lief. Morgen geht es weiter."
 ];
 export const DEFAULT_IDEAS=["Spaziergang im Wald","Neues Café ausprobieren","Radtour","Buch im Park lesen","Freunde anrufen","Neues Rezept kochen","Schwimmen gehen","Museum besuchen","Kino","Sauna","Fotospaziergang","Brettspielabend","Flohmarkt","Sonnenuntergang anschauen","Bouldern","Picknick","Podcast beim Gehen","Tagebuch schreiben","Ausflug in eine Nachbarstadt","Ausschlafen ohne Wecker"];
 export const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
@@ -83,14 +83,16 @@ export function model(get,today){
   // Alle Mitteilungen eines Tages; min = Minute des Tages (kann vor 0 liegen)
   function notificationsFor(s){
     const st=settings(), out=[], mt=toMin(st.morning.time||"08:30");
-    if(st.morning.on)out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Steve!",body:QUOTES[parse(s).getDate()-1],btn:"Danke!",until:mt+240});
-    supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Ey, du musst ${it.label} nachbestellen!`,
-      body:x.nights===0?"Du hast keine mehr übrig.":`Noch ${x.left} Stück. Tippe in der App auf „Hab ich bestellt“, dann ist Ruhe.`,btn:"Okay",until:mt+240}));
+    if(st.morning.on){
+      out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body:"Ich hoffe, Sie sind bereit für den Tag.",btn:"Bereit!",until:mt+240});
+      out.push({key:"quote-"+s,min:mt,title:"Ihr Spruch für heute",body:QUOTES[parse(s).getDate()-1],btn:"Danke!",until:mt+240})}
+    supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
+      body:x.nights===0?"Sie haben keine mehr übrig.":`Noch ${x.left} Stück. Tippen Sie in der App auf „Ich habe bestellt“, dann ist Ruhe.`,btn:"Okay",until:mt+240}));
     const t=timed(s);
     if(st.remind.on)t.filter(x=>st.remind.kinds.includes(x.kind)).forEach(x=>out.push({key:`r-${s}-${x.a}-${x.id}`,min:x.a-st.remind.before,
-      title:st.remind.before?`In ${st.remind.before} Min.: ${x.title}`:`Jetzt: ${x.title}`,body:"Gleich geht's los. Bist du bereit?",btn:"Bereit!",until:x.a+1}));
+      title:st.remind.before?`In ${st.remind.before} Min.: ${x.title}`:`Jetzt: ${x.title}`,body:"Gleich geht es los. Sind Sie bereit, Meister?",btn:"Bereit!",until:x.a+1}));
     if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
-      title:"Zeit, zur Arbeit loszufahren!",body:`Arbeitsbeginn um ${hm(x.a)}. Bist du ready?`,btn:"Bin unterwegs!",until:x.a}));
+      title:"Meister, Zeit zur Arbeit loszufahren!",body:`Arbeitsbeginn um ${hm(x.a)}. Sind Sie bereit?`,btn:"Bin unterwegs!",until:x.a}));
     return out.sort((x,y)=>x.min-y.min);
   }
   return{month,templates,plan,ideas,supply,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
