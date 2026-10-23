@@ -1,0 +1,2 @@
+# avanor-tagesplaner
+privat
