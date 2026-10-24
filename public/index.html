@@ -378,10 +378,11 @@ async function fillPush(){
     unsupported:`<p>Dieser Browser kann keine Mitteilungen empfangen. Auf dem iPhone geht es über das Icon auf dem Home-Bildschirm.</p>`,
     denied:`<p>Mitteilungen sind blockiert. Erlauben Sie sie in den iPhone-Einstellungen unter <b>Mitteilungen → AVANOR</b>.</p>`,
     off:`<p>Auf diesem Gerät sind Mitteilungen noch aus.</p><button type="button" class="btn primary" data-act="pushon">Mitteilungen aktivieren</button>`,
-    on:`<p style="color:var(--mint);font-weight:700">Mitteilungen sind auf diesem Gerät aktiv.</p><div class="row"><button type="button" class="btn small" data-act="pushtest">Test-Mitteilung</button><button type="button" class="btn small" data-act="pushoff">Ausschalten</button></div><div id="upcoming" class="muted" style="font-size:.85rem"></div>`
+    on:`<p style="color:var(--mint);font-weight:700">Mitteilungen sind auf diesem Gerät aktiv.</p><div class="row"><button type="button" class="btn small" data-act="pushtest">Test-Mitteilung</button><button type="button" class="btn small" data-act="pushoff">Ausschalten</button></div><div id="upcoming" class="muted" style="font-size:.85rem"></div><div id="sentlog" class="muted" style="font-size:.85rem"></div>`
   }[s];
   box.innerHTML=msg;
-  if(s==="on")API.call("/upcoming").then(u=>{const el=$("#upcoming");if(el)el.innerHTML=u.items.length?"<b>Als Nächstes geplant:</b><br>"+u.items.slice(0,5).map(i=>`${esc(new Date(i.ts).toLocaleString("de-DE",{weekday:"short",hour:"2-digit",minute:"2-digit"}))} · ${esc(i.title)}`).join("<br>"):"Heute und morgen ist keine Mitteilung geplant."}).catch(()=>{});
+  if(s==="on")API.call("/upcoming").then(u=>{const el=$("#upcoming");if(el)el.innerHTML=u.items.length?"<b>Als Nächstes geplant:</b><br>"+u.items.slice(0,5).map(i=>`${esc(new Date(i.ts).toLocaleString("de-DE",{weekday:"short",hour:"2-digit",minute:"2-digit"}))} · ${esc(i.title)}`).join("<br>"):"Heute und morgen ist keine Mitteilung geplant.";
+    const lg=$("#sentlog");if(lg)lg.innerHTML=u.log&&u.log.length?"<b>Zuletzt verschickt:</b><br>"+u.log.map(l=>`${esc(new Date(l.ts).toLocaleString("de-DE",{weekday:"short",hour:"2-digit",minute:"2-digit"}))} · ${esc(l.title)} · ${/^2\d\d/.test(l.result)?"✓ zugestellt":"✗ "+esc(l.result)}`).join("<br>"):""}).catch(()=>{});
 }
 /* Hinweise in der App, wenn auf diesem Gerät keine Mitteilungen aktiv sind */
 const seen=new Set();

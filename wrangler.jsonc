@@ -6,5 +6,6 @@
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
   "durable_objects": { "bindings": [{ "name": "PLANNER", "class_name": "Planner" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Planner"] }],
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }
 }

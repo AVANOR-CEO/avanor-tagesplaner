@@ -37,6 +37,10 @@ export default {
     if (url.pathname.startsWith("/api/")) return env.PLANNER.get(env.PLANNER.idFromName("steve")).fetch(req);
     return env.ASSETS.fetch(req);
   },
+  // Sicherheitsnetz: jede Minute nachsehen, ob etwas fällig ist (falls ein Alarm ausfällt)
+  async scheduled(event, env) {
+    await env.PLANNER.get(env.PLANNER.idFromName("steve")).tick();
+  },
 };
 
 /* Ein einziges Objekt hält Steves Daten, Push-Abos und den Zeitplan der Mitteilungen */
@@ -116,7 +120,9 @@ export class Planner extends DurableObject {
 
     if (p === "/api/upcoming") {
       const subs = (await st.get("subs")) || [];
-      return json({ devices: subs.length, tz: await this.tz(), items: (await this.queue()).slice(0, 15).map(n => ({ ts: n.ts, title: n.title })) });
+      const alarm = await st.getAlarm();
+      return json({ devices: subs.length, tz: await this.tz(), alarm, log: ((await st.get("log")) || []).slice(-8).reverse(),
+        items: (await this.queue()).slice(0, 15).map(n => ({ ts: n.ts, title: n.title })) });
     }
 
     return json({ error: "Nicht gefunden." }, 404);
@@ -166,16 +172,32 @@ export class Planner extends DurableObject {
     await this.ctx.storage.setAlarm(next);
   }
 
-  async alarm() {
-    const now = Date.now();
-    const sent = (await this.ctx.storage.get("sent")) || {};
-    for (const n of (await this.queue()).filter(n => n.ts <= now + 20000)) {
-      await this.sendAll({ title: n.title, body: n.body, key: n.key });
-      sent[n.key] = now;
+  async alarm() { await this.tick(); }
+
+  // Fällige Mitteilungen verschicken; Fehler werden protokolliert, der Zeitplan läuft trotzdem weiter
+  async tick() {
+    const now = Date.now(), st = this.ctx.storage;
+    try {
+      const sent = (await st.get("sent")) || {};
+      for (const n of (await this.queue()).filter(n => n.ts <= now + 20000)) {
+        if (sent[n.key]) continue;
+        sent[n.key] = now;
+        await st.put("sent", sent);
+        const r = await this.sendAll({ title: n.title, body: n.body, key: n.key });
+        await this.log(n.title, r.statuses.join(",") || "kein Gerät");
+      }
+      for (const [k, t] of Object.entries(sent)) if (t < now - 3 * 864e5) delete sent[k];
+      await st.put("sent", sent);
+    } catch (e) {
+      await this.log("Fehler", String((e && e.message) || e));
     }
-    for (const [k, t] of Object.entries(sent)) if (t < now - 3 * 864e5) delete sent[k];
-    await this.ctx.storage.put("sent", sent);
-    await this.schedule();
+    try { await this.schedule(); } catch (e) { await st.setAlarm(now + 60000); }
+  }
+
+  async log(title, result) {
+    const l = ((await this.ctx.storage.get("log")) || []).slice(-29);
+    l.push({ ts: Date.now(), title, result });
+    await this.ctx.storage.put("log", l);
   }
 
   async sendAll(payload) {
@@ -183,13 +205,15 @@ export class Planner extends DurableObject {
     const subject = (await st.get("origin")) || "https://avanor-tagesplaner.workers.dev";
     const subs = (await st.get("subs")) || [], keep = [];
     let ok = 0;
+    const statuses = [];
     for (const s of subs) {
       let status = 0;
       try { status = await sendPush(s, payload, vapid, subject); } catch { status = 0; }
+      statuses.push(status);
       if (status >= 200 && status < 300) ok++;
       if (status !== 404 && status !== 410) keep.push(s);
     }
     if (keep.length !== subs.length) await st.put("subs", keep);
-    return { sent: ok, devices: keep.length };
+    return { sent: ok, devices: keep.length, statuses };
   }
 }
