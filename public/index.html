@@ -325,6 +325,8 @@ function alertsHtml(){return supplyAlerts().map(({k,it,st})=>`
     <div class="row"><button class="btn primary" data-act="ordered" data-k="${k}">Ich habe bestellt</button></div>
   </div>`).join("")}
 
+// Countdown mm:ss bis zum Start, in den letzten 10 Minuten
+const countdown=ts=>{const r=Math.max(0,Math.round((ts-Date.now())/1000));return `${Math.floor(r/60)}:${pad(r%60)} Min.`};
 function clockHtml(){const n=new Date();return `${pad(n.getHours())}:${pad(n.getMinutes())}<small>:${pad(n.getSeconds())}</small>`}
 function nowHtml(){
   const s=today(), n=new Date(), nm=n.getHours()*60+n.getMinutes(), t=timed(s);
@@ -333,7 +335,7 @@ function nowHtml(){
   for(let i=1;i<=14&&!next;i++)next=timed(addDays(s,i))[0];
   let when="";
   if(next){const days=diffDays(s,next.s),mins=days*1440+next.a-nm;
-    when=days===0?`um ${hm(next.a)} · in ${mins<60?mins+" Min.":dur(mins)}`:`${days===1?"morgen":esc(fmt(next.s,{weekday:"long"}))} um ${hm(next.a)}`}
+    when=days===0?(mins<=10?`um ${hm(next.a)} · in <span id="countdown" data-ts="${parse(next.s).getTime()+next.a*60000}">${countdown(parse(next.s).getTime()+next.a*60000)}</span>`:`um ${hm(next.a)} · in ${mins<60?mins+" Min.":dur(mins)}`):`${days===1?"morgen":esc(fmt(next.s,{weekday:"long"}))} um ${hm(next.a)}`}
   const run=running.map(x=>`<span class="run"><i></i>Läuft: ${esc(x.title)}${x.end?` bis ${esc(x.end)} (noch ${x.b-nm<60?(x.b-nm)+" Min.":dur(x.b-nm)})`:""}</span>`).join("");
   return `<div class="nowcard"><div class="clock" id="clock" aria-label="Uhrzeit">${clockHtml()}</div>
     <button class="nx" data-act="opennext" data-date="${next?next.s:s}"><span class="eyebrow">Als Nächstes</span>
@@ -406,10 +408,12 @@ function settingsSheet(){
       <label class="field"><span>Uhrzeit</span><input type="time" id="s-mtime" value="${esc(st.morning.time)}"></label></div>
     <div class="set"><label class="row" style="gap:8px"><input type="checkbox" id="s-ron" ${st.remind.on?"checked":""}><b>Erinnerung „Sind Sie bereit?“</b></label>
       <label class="field"><span>Minuten vor dem Start</span><input type="number" id="s-before" min="0" max="120" inputmode="numeric" value="${st.remind.before}"></label>
+      <label class="row" style="gap:8px"><input type="checkbox" id="s-rstart" ${st.remind.atStart?"checked":""}> Zusätzlich genau zum Start erinnern</label>
       <span class="eyebrow">Für diese Einträge</span>
       <div class="row">${ALL_KINDS.filter(k=>k!=="arbeit").map(k=>`<label><input type="checkbox" id="s-k-${k}" ${st.remind.kinds.includes(k)?"checked":""}> ${KIND[k]}</label>`).join("")}</div></div>
     <div class="set"><label class="row" style="gap:8px"><input type="checkbox" id="s-won" ${st.work.on?"checked":""}><b>Losfahren zur Arbeit</b></label>
-      <label class="field"><span>Minuten vor Arbeitsbeginn (Ihre Fahrzeit)</span><input type="number" id="s-wbefore" min="1" max="180" inputmode="numeric" value="${st.work.before}"></label>
+      <label class="field"><span>Fertigmachen: Minuten vor Arbeitsbeginn</span><input type="number" id="s-wprep" min="0" max="240" inputmode="numeric" value="${st.work.prep}"></label>
+      <label class="field"><span>Losfahren: Minuten vor Arbeitsbeginn (Ihre Fahrzeit)</span><input type="number" id="s-wbefore" min="1" max="180" inputmode="numeric" value="${st.work.before}"></label>
       <span class="muted" style="font-size:.85rem">Gilt automatisch für jeden Eintrag der Art „Arbeit“, statt der kurzen Erinnerung.</span></div>
     <div class="set"><label class="row" style="gap:8px"><input type="checkbox" id="s-eon" ${st.evening.on?"checked":""}><b>Feierabend-Gruß</b></label>
       <label class="field"><span>Uhrzeit</span><input type="time" id="s-etime" value="${esc(st.evening.time)}"></label>
@@ -438,7 +442,7 @@ async function init(){
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)Store.pull()});
 setInterval(()=>{if(!document.hidden)Store.pull()},30000);
 addEventListener("online",()=>Store.flush());
-setInterval(()=>{if(Math.floor(Date.now()/1000)%15===0)checkReminders();if(ui.page!=="home")return;const c=$("#clock");if(c)c.innerHTML=clockHtml();
+setInterval(()=>{if(Math.floor(Date.now()/1000)%15===0)checkReminders();if(ui.page!=="home")return;const c=$("#clock");if(c)c.innerHTML=clockHtml();const cd=$("#countdown");if(cd)cd.textContent=countdown(Number(cd.dataset.ts));
   const m=new Date().getMinutes();if(m!==lastMin){lastMin=m;if($("#sheet").hidden)render()}},1000);
 function vHome(){
   const s=today(), q=QUOTES[parse(s).getDate()-1];
@@ -692,9 +696,9 @@ document.addEventListener("submit",e=>{
   else if(f.dataset.form==="plan"){draft.title=$("#p-title").value.trim();if(!draft.title)return;if(!(draft.days||[]).length){toast("Bitte mindestens einen Wochentag wählen.");return}
     const l=plan();const i=l.findIndex(x=>x.id===draft.id);if(i>=0)l[i]=draft;else l.push(draft);Store.put("training",{plan:l});closeSheet();toast("Trainingsplan gespeichert")}
   else if(f.dataset.form==="settings"){const before=Math.max(0,Math.min(120,parseInt($("#s-before").value,10)||0));
-    Store.put("settings",{morning:{on:$("#s-mon").checked,time:$("#s-mtime").value||"08:30"},remind:{on:$("#s-ron").checked,before,kinds:ALL_KINDS.filter(k=>k==="arbeit"||$("#s-k-"+k).checked)},
+    Store.put("settings",{morning:{on:$("#s-mon").checked,time:$("#s-mtime").value||"08:30"},remind:{on:$("#s-ron").checked,before,atStart:$("#s-rstart").checked,kinds:ALL_KINDS.filter(k=>k==="arbeit"||$("#s-k-"+k).checked)},
       evening:{on:$("#s-eon").checked,time:$("#s-etime").value||"22:00"},
-      work:{on:$("#s-won").checked,before:Math.max(1,Math.min(180,parseInt($("#s-wbefore").value,10)||20))}});
+      work:{on:$("#s-won").checked,before:Math.max(1,Math.min(180,parseInt($("#s-wbefore").value,10)||20)),prep:Math.max(0,Math.min(240,parseInt($("#s-wprep").value,10)||0))}});
     closeSheet();toast("Einstellungen gespeichert");checkReminders()}
   else if(f.dataset.form==="idea"){const v=$("#newIdea").value.trim();if(v)Store.put("ideas",{list:[...ideas(),v]})}
   else if(f.dataset.form==="setup"){const n=parseInt($("#setup-"+k).value,10);if(n>=0){const s=supply();s.items[k]={label:SUPPLY_DEF[k],count:n,asOf:today(),ordered:false};Store.put("supply",s)}}

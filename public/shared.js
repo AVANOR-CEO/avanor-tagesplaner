@@ -70,8 +70,8 @@ export function model(get,today){
   const supply=()=>get("supply",{items:{}});
   function settings(){const s=get("settings",{});return{
     morning:Object.assign({on:true,time:"08:30"},s.morning),
-    remind:Object.assign({on:true,before:5,kinds:ALL_KINDS},s.remind),
-    work:Object.assign({on:true,before:20},s.work),
+    remind:Object.assign({on:true,before:5,atStart:true,kinds:ALL_KINDS},s.remind),
+    work:Object.assign({on:true,before:20,prep:25},s.work),
     evening:Object.assign({on:true,time:"22:00"},s.evening)}}
   function itemsOn(s){return Object.values(month(s).items||{}).filter(i=>i.date===s).sort((a,b)=>(a.start||"99").localeCompare(b.start||"99"))}
   function routinesOn(s){const w=wday(s);return templates().filter(t=>t.active!==false&&(t.repeat==="daily"||(t.repeat==="weekly"&&(t.days||[]).includes(w))))}
@@ -99,10 +99,17 @@ export function model(get,today){
     supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
       body:x.nights===0?"Sie haben keine mehr übrig.":`Noch ${x.left} Stück. Tippen Sie in der App auf „Ich habe bestellt“, dann ist Ruhe.`,btn:"Okay",until:mt+240}));
     const t=timed(s);
-    if(st.remind.on)t.filter(x=>st.remind.kinds.includes(x.kind)&&!(x.kind==="arbeit"&&st.work.on)).forEach(x=>out.push({key:`r-${s}-${x.a}-${x.id}`,min:x.a-st.remind.before,
-      title:st.remind.before?`In ${st.remind.before} Min.: ${x.title}`:`Jetzt: ${x.title}`,body:"Gleich geht es los. Sind Sie bereit, Meister?",btn:"Bereit!",until:x.a+1}));
-    if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
-      title:"Meister, Zeit zur Arbeit zu fahren!",body:"Passen Sie auf sich auf!",btn:"Bin unterwegs!",until:x.a}));
+    if(st.remind.on)t.filter(x=>st.remind.kinds.includes(x.kind)&&!(x.kind==="arbeit"&&st.work.on)).forEach(x=>{
+      if(st.remind.before)out.push({key:`r-${s}-${x.a}-${x.id}`,min:x.a-st.remind.before,
+        title:`In ${st.remind.before} Min.: ${x.title}`,body:`Startet um ${hm(x.a)}. Sind Sie bereit, Meister?`,btn:"Bereit!",until:x.a});
+      // Zweite Mitteilung genau zum Start
+      if(st.remind.atStart||!st.remind.before)out.push({key:`s-${s}-${x.a}-${x.id}`,min:x.a,
+        title:`Jetzt: ${x.title}`,body:"Es geht los, Meister!",btn:"Los geht's!",until:x.a+5})});
+    if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>{
+      if(st.work.prep>st.work.before)out.push({key:`p-${s}-${x.a}-${x.id}`,min:x.a-st.work.prep,
+        title:"Meister, Zeit sich fertig zu machen!",body:`Schnell anziehen und fertig machen. In ${st.work.prep-st.work.before} Minuten geht es los zur Arbeit.`,btn:"Bin dabei!",until:x.a-st.work.before});
+      out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
+        title:"Meister, Zeit zur Arbeit zu fahren!",body:"Passen Sie auf sich auf!",btn:"Bin unterwegs!",until:x.a})});
     // Feierabend-Gruß; läuft danach noch etwas, kommt er erst, wenn das Letzte vorbei ist
     if(st.evening.on&&st.evening.time){const et=toMin(st.evening.time);
       const last=Math.max(et,...t.filter(x=>x.b>et).map(x=>x.b));
