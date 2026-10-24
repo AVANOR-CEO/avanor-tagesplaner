@@ -71,7 +71,7 @@ export function model(get,today){
   function settings(){const s=get("settings",{});return{
     morning:Object.assign({on:true,time:"08:30"},s.morning),
     remind:Object.assign({on:true,before:5,atStart:true,kinds:ALL_KINDS},s.remind),
-    work:Object.assign({on:true,before:20,prep:25},s.work),
+    work:Object.assign({on:true,before:20,prep:30},s.work),
     evening:Object.assign({on:true,time:"22:00"},s.evening)}}
   function itemsOn(s){return Object.values(month(s).items||{}).filter(i=>i.date===s).sort((a,b)=>(a.start||"99").localeCompare(b.start||"99"))}
   function routinesOn(s){const w=wday(s);return templates().filter(t=>t.active!==false&&(t.repeat==="daily"||(t.repeat==="weekly"&&(t.days||[]).includes(w))))}
