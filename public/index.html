@@ -153,6 +153,10 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:va
 .cal .wd{text-align:center;font-size:.72rem;color:var(--muted);font-weight:700;padding-bottom:4px}
 .day{aspect-ratio:1/1;max-width:100%;border-radius:10px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-variant-numeric:tabular-nums;font-weight:700;font-size:.95rem;padding:0}
 .day.other{opacity:.35}
+.day.away{background:var(--mint-soft)}
+.offday{padding:12px 16px;border-radius:var(--r);border:1px solid var(--mint);background:var(--mint-soft);display:flex;flex-direction:column;gap:2px}
+.offday b{color:var(--mint)}
+.awayrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .day.today{border-color:var(--mint);color:var(--mint)}
 .day.sel{background:var(--mint);color:var(--on-mint);border-color:var(--mint)}
 .dots{display:flex;gap:3px;height:6px}
@@ -235,7 +239,7 @@ details summary{cursor:pointer}
 <div class="banners" id="banners" aria-live="polite"></div>
 
 <script type="module">
-import {QUOTES,WD,KIND,ALL_KINDS,SUPPLY_DEF,WARN_DAYS,PER_NIGHT,pad,ds,parse,addDays,diffDays,wday,toMin,hm,dur,mkey,span,model} from "/shared.js";
+import {QUOTES,WD,KIND,AWAY,ALL_KINDS,SUPPLY_DEF,WARN_DAYS,PER_NIGHT,pad,ds,parse,addDays,diffDays,wday,toMin,hm,dur,mkey,span,model} from "/shared.js";
 const ICON={
  kalender:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
  aufgaben:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/></svg>',
@@ -285,7 +289,7 @@ const Store={docs:LS.get("tp-docs",{}),dirty:new Set(LS.get("tp-dirty",[])),busy
 };
 
 /* ---------- Daten ---------- */
-const {month,templates,plan,ideas,supply,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor}=model((id,def)=>Store.get(id,def),today);
+const {month,templates,plan,ideas,supply,away,awayOn,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor}=model((id,def)=>Store.get(id,def),today);
 function saveItem(it){const k=mkey(it.date);const m=month(it.date);m.items=m.items||{};m.items[it.id]=it;Store.put(k,m)}
 function deleteItem(it){const k=mkey(it.date);const m=month(it.date);delete m.items[it.id];Store.put(k,m)}
 function toggleDone(s,id){const k=mkey(s);const m=month(s);m.done=m.done||{};m.done[s]=m.done[s]||{};if(m.done[s][id])delete m.done[s][id];else m.done[s][id]=true;Store.put(k,m)}
@@ -422,6 +426,13 @@ function settingsSheet(){
       <label class="field"><span>Uhrzeit</span><input type="time" id="s-etime" value="${esc(st.evening.time)}"></label>
       <span class="muted" style="font-size:.85rem">Ist danach noch etwas eingetragen, kommt der Gruß, sobald das Letzte vorbei ist.</span></div>
     <button class="btn primary">Speichern</button>
+    <div class="set"><b>Frei &amp; Urlaub</b>
+      <span class="muted" style="font-size:.85rem">An diesen Tagen gibt es morgens einen besonderen Gruß und keine Arbeits-Erinnerungen.</span>
+      <div>${away().filter(a=>(a.to||a.from)>=today()).sort((x,y)=>x.from.localeCompare(y.from)).map(a=>`<div class="awayrow"><span><b>${AWAY[a.type]||"Frei"}</b> · ${esc(fmt(a.from,{day:"numeric",month:"short"}))}${a.to&&a.to!==a.from?" – "+esc(fmt(a.to,{day:"numeric",month:"short"})):""}${a.note?`<br><small class="muted">${esc(a.note)}</small>`:""}</span><button type="button" class="btn ghost small" data-act="delaway" data-id="${a.id}">Löschen</button></div>`).join("")||'<span class="muted">Nichts eingetragen.</span>'}</div>
+      <label class="field"><span>Art</span><select id="a-type"><option value="frei">Freier Tag</option><option value="urlaub">Urlaub</option></select></label>
+      <div class="row"><label class="field" style="flex:1"><span>Von</span><input type="date" id="a-from"></label><label class="field" style="flex:1"><span>Bis</span><input type="date" id="a-to"></label></div>
+      <label class="field"><span>Notiz für den Morgengruß (optional)</span><input id="a-note" maxlength="140"></label>
+      <button type="button" class="btn" data-act="addaway">Eintragen</button></div>
     <details class="set"><summary><b>Daten aus der alten App übernehmen</b></summary>
       <div class="stack" style="margin-top:10px"><p class="muted" style="font-size:.88rem">Öffnen Sie die alte App bei Claude, tippen Sie dort im Zahnrad auf „Daten kopieren“ und fügen Sie den Text hier ein.</p>
       <textarea id="imp" rows="4" placeholder="Hier einfügen"></textarea>
@@ -453,6 +464,9 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden)flushNow()}
 addEventListener("pagehide",flushNow);
 setInterval(()=>{if(Math.floor(Date.now()/1000)%15===0)checkReminders();if(ui.page!=="home")return;const c=$("#clock");if(c)c.innerHTML=clockHtml();const cd=$("#countdown");if(cd)cd.textContent=countdown(Number(cd.dataset.ts));
   const m=new Date().getMinutes();if(m!==lastMin){lastMin=m;if($("#sheet").hidden)render()}},1000);
+function offdayHtml(s){const a=awayOn(s);if(!a)return "";
+  const bis=a.to&&a.to!==a.from?` bis ${esc(fmt(a.to,{weekday:"short",day:"numeric",month:"long"}))}`:"";
+  return `<div class="offday"><b>${a.type==="urlaub"?"Urlaub"+bis:"Freier Tag"+bis}</b><span>${a.type==="urlaub"?"Genießen Sie die Zeit mit Ihrer Prinzessin, Meister.":"Einen schönen freien Tag mit Ihrer Prinzessin, Meister."}${a.note?" "+esc(a.note):""}</span></div>`}
 function vHome(){
   const s=today(), q=QUOTES[parse(s).getDate()-1];
   const tc=taskCount(s);
@@ -462,10 +476,10 @@ function vHome(){
   const sup=supply().items, alerts=supplyAlerts();
   const minN=Object.values(sup).map(it=>supplyState(it).nights);
   const supTxt=!minN.length?"Bestand eintragen":alerts.length?"Nachbestellen!":`Noch ${Math.min(...minN)} Nächte`;
-  return `${nowHtml()}${alertsHtml()}
+  return `${nowHtml()}${offdayHtml(s)}${alertsHtml()}
   <div class="quote"><p>${esc(q)}</p><small>Spruch zum ${parse(s).getDate()}.</small></div>
   <nav class="tiles" aria-label="Bereiche">
-    <button class="tile" data-act="go" data-p="kalender">${ICON.kalender}<div><b>Kalender</b><span>${work?`Arbeit ${esc(work.start)}${work.end?"–"+esc(work.end):""}`:appts.length?`${appts.length} ${appts.length===1?"Eintrag":"Einträge"} heute`:"Heute frei"}</span></div></button>
+    <button class="tile" data-act="go" data-p="kalender">${ICON.kalender}<div><b>Kalender</b><span>${work?`Arbeit ${esc(work.start)}${work.end?"–"+esc(work.end):""}`:appts.length?`${appts.length} ${appts.length===1?"Eintrag":"Einträge"} heute`:awayOn(s)?(awayOn(s).type==="urlaub"?"Urlaub":"Heute frei"):"Heute frei"}</span></div></button>
     <button class="tile" data-act="go" data-p="aufgaben">${ICON.aufgaben}<div><b>Tagesaufgaben</b><span>${tc.total?`${tc.done} von ${tc.total} erledigt`:"Noch keine Aufgaben"}</span></div></button>
     <button class="tile" data-act="go" data-p="training">${ICON.training}<div><b>Training</b><span>${trainedOn(s)?"Heute erledigt ✓":pl.length?"Heute: "+esc(pl.map(p=>p.title).join(", ")):"Heute Ruhetag"}</span></div></button>
     <button class="tile ${alerts.length?"warn":""}" data-act="go" data-p="vorrat">${ICON.vorrat}<div><b>Nasenpflaster &amp; Mundtapes</b><span>${supTxt}</span></div></button>
@@ -517,7 +531,7 @@ function vKalender(){
   const cells=[];for(let i=0;i<42;i++){const s=addDays(start,i);if(i===35&&s.slice(0,7)!==ui.cal)break;cells.push(s)}
   const t=today();
   const grid=cells.map(s=>{const kinds=[...new Set(itemsOn(s).map(i=>i.kind))];
-    return `<button class="day ${s.slice(0,7)!==ui.cal?"other":""} ${s===t?"today":""} ${s===ui.sel?"sel":""}" data-act="sel" data-date="${s}" aria-label="${esc(fmt(s,{weekday:"long",day:"numeric",month:"long"}))}">
+    return `<button class="day ${s.slice(0,7)!==ui.cal?"other":""} ${awayOn(s)?"away":""} ${s===t?"today":""} ${s===ui.sel?"sel":""}" data-act="sel" data-date="${s}" aria-label="${esc(fmt(s,{weekday:"long",day:"numeric",month:"long"}))}">
       ${parse(s).getDate()}<span class="dots">${kinds.map(k=>`<i class="${k}"></i>`).join("")}</span></button>`}).join("");
   const s=ui.sel, items=itemsOn(s);
   const hasFree=items.some(i=>i.kind==="frei");
@@ -531,6 +545,7 @@ function vKalender(){
     <div class="cal">${WD.map(w=>`<span class="wd">${w}</span>`).join("")}${grid}</div>
     <div class="row muted" style="font-size:.8rem;gap:12px">${Object.entries(KIND).map(([k,l])=>`<span class="row" style="gap:5px"><span class="dots"><i class="${k}"></i></span>${l}</span>`).join("")}${ui.cal!==t.slice(0,7)||ui.sel!==t?`<button class="btn ghost small" data-act="gotoday">Zu heute</button>`:""}</div></section>
   <section id="dayview"><div class="row between"><div class="daynav"><button class="btn small" data-act="day" data-d="-1" aria-label="Vortag">‹</button><h2>${esc(fmt(s,{weekday:"short",day:"numeric",month:"long"}))}</h2><button class="btn small" data-act="day" data-d="1" aria-label="Nächster Tag">›</button></div><button class="btn primary small" data-act="new" data-date="${s}">+ Eintrag</button></div>
+    ${offdayHtml(s)}
     <div class="sum">${workMin?`<span>Arbeit <b>${dur(workMin)}</b></span>`:""}<span><b>${items.filter(i=>i.kind!=="aufgabe").length}</b> Einträge</span>${tc.total?`<span>Aufgaben <b>${tc.done}/${tc.total}</b></span>`:""}${pl.length?`<span>Training: <b>${esc(pl.map(p=>p.title).join(", "))}</b></span>`:""}</div>
     ${untimed.length||rUntimed.length?`<div class="stack" style="gap:6px"><span class="eyebrow">Ohne Uhrzeit</span>
       ${untimed.length?`<div class="items">${untimed.map(itemHtml).join("")}</div>`:""}
@@ -687,6 +702,10 @@ document.addEventListener("click",e=>{
   else if(a==="deltpl"){if(!confirmDel){confirmDel=true;b.textContent="Wirklich löschen?";return}Store.put("templates",{list:templates().filter(x=>x.id!==draft.id)});closeSheet();toast("Vorlage gelöscht")}
   else if(a==="plan"){const p=d.id?plan().find(x=>x.id===d.id):null;planSheet(p?clone(p):{id:nid(),title:"",days:[wday(today())]})}
   else if(a==="delplan"){if(!confirmDel){confirmDel=true;b.textContent="Wirklich löschen?";return}Store.put("training",{plan:plan().filter(x=>x.id!==draft.id)});closeSheet();toast("Einheit gelöscht")}
+  else if(a==="addaway"){const from=$("#a-from").value,to=$("#a-to").value||from;if(!from){toast("Bitte ein Datum wählen.");return}
+    if(to<from){toast("„Bis“ liegt vor „Von“.");return}
+    Store.put("away",{list:[...away(),{id:nid(),type:$("#a-type").value,from,to,note:$("#a-note").value.trim()}]});toast("Eingetragen");settingsSheet()}
+  else if(a==="delaway"){Store.put("away",{list:away().filter(x=>x.id!==d.id)});settingsSheet()}
   else if(a==="delidea"){const l=[...ideas()];l.splice(Number(d.i),1);Store.put("ideas",{list:l})}
   else if(a==="ordered"){const s=supply();if(s.items[d.k]){s.items[d.k].ordered=true;Store.put("supply",s);toast("Sehr wohl, ich erinnere Sie nicht mehr.")}}
 });

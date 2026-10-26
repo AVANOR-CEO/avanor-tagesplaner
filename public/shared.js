@@ -46,6 +46,7 @@ export const WD=["Mo","Di","Mi","Do","Fr","Sa","So"];
 export const KIND={termin:"Termin",arbeit:"Arbeit",aufgabe:"Aufgabe",frei:"Freizeit",training:"Training"};
 export const ALL_KINDS=["termin","arbeit","aufgabe","training","frei"];
 export const SUPPLY_DEF={strips:"Nasenpflaster",tape:"Mundtapes"};
+export const AWAY={frei:"Frei",urlaub:"Urlaub"};
 export const WARN_DAYS=7, PER_NIGHT=1;
 
 export const pad=n=>String(n).padStart(2,"0");
@@ -68,6 +69,9 @@ export function model(get,today){
   const plan=()=>get("training",{plan:[]}).plan;
   const ideas=()=>get("ideas",{list:DEFAULT_IDEAS}).list;
   const supply=()=>get("supply",{items:{}});
+  // Freie Tage und Urlaub: {list:[{id,type:"frei"|"urlaub",from,to,note}]}
+  const away=()=>get("away",{list:[]}).list;
+  const awayOn=s=>away().find(a=>a.from<=s&&s<=(a.to||a.from))||null;
   function settings(){const s=get("settings",{});return{
     morning:Object.assign({on:true,time:"08:30"},s.morning),
     remind:Object.assign({on:true,before:5,atStart:true,kinds:ALL_KINDS},s.remind),
@@ -94,7 +98,11 @@ export function model(get,today){
   function notificationsFor(s){
     const st=settings(), out=[], mt=toMin(st.morning.time||"08:30");
     if(st.morning.on){
-      out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body:"Ich hoffe, Sie sind bereit für den Tag.",btn:"Bereit!",until:mt+240});
+      const off=awayOn(s);
+      const body=!off?"Ich hoffe, Sie sind bereit für den Tag.":
+        (off.type==="urlaub"?"Sie haben Urlaub! Ich wünsche Ihnen einen wunderschönen Tag mit Ihrer Prinzessin. Erholen Sie sich gut."
+          :"Heute haben Sie frei! Ich wünsche Ihnen einen wunderschönen freien Tag mit Ihrer Prinzessin.")+(off.note?" "+off.note:"");
+      out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body,btn:off?"Danke!":"Bereit!",until:mt+240});
       out.push({key:"quote-"+s,min:mt,title:"Ihr Spruch für heute",body:QUOTES[parse(s).getDate()-1],btn:"Danke!",until:mt+240})}
     supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
       body:x.nights===0?"Sie haben keine mehr übrig.":`Noch ${x.left} Stück. Tippen Sie in der App auf „Ich habe bestellt“, dann ist Ruhe.`,btn:"Okay",until:mt+240}));
@@ -105,7 +113,8 @@ export function model(get,today){
       // Zweite Mitteilung genau zum Start
       if(st.remind.atStart||!st.remind.before)out.push({key:`s-${s}-${x.a}-${x.id}`,min:x.a,
         title:`Jetzt: ${x.title}`,body:"Es geht los, Meister!",btn:"Los geht's!",until:x.a+5})});
-    if(st.work.on)t.filter(x=>x.kind==="arbeit").forEach(x=>{
+    // An freien Tagen und im Urlaub keine Arbeits-Erinnerungen
+    if(st.work.on&&!awayOn(s))t.filter(x=>x.kind==="arbeit").forEach(x=>{
       if(st.work.prep>st.work.before)out.push({key:`p-${s}-${x.a}-${x.id}`,min:x.a-st.work.prep,
         title:"Meister, Zeit sich fertig zu machen!",body:`Schnell anziehen und fertig machen. In ${st.work.prep-st.work.before} Minuten geht es los zur Arbeit.`,btn:"Bin dabei!",until:x.a-st.work.before});
       out.push({key:`w-${s}-${x.a}-${x.id}`,min:x.a-st.work.before,
@@ -116,5 +125,5 @@ export function model(get,today){
       if(last<1440)out.push({key:"evening-"+s,min:last,title:"Schönen Feierabend, Meister!",body:EVENING[parse(s).getDate()%EVENING.length],btn:"Danke!",until:last+120})}
     return out.sort((x,y)=>x.min-y.min);
   }
-  return{month,templates,plan,ideas,supply,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
+  return{month,templates,plan,ideas,supply,away,awayOn,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
 }

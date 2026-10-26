@@ -7,6 +7,19 @@ const json = (data, status = 200) =>
 
 const DOC_ID = /^[\w.-]{1,40}$/;
 
+// Einmalige Einträge, die Claude für Steve vornimmt (jeder Satz wird genau einmal angewendet)
+const SEEDS = [
+  { id: "seed-2026-10-26",
+    away: [
+      { id: "s1028", type: "frei", from: "2026-10-28", to: "2026-10-28", note: "" },
+      { id: "s1101", type: "frei", from: "2026-11-01", to: "2026-11-01", note: "Denken Sie heute ans Packen für den Urlaub!" },
+      { id: "s1102", type: "urlaub", from: "2026-11-02", to: "2026-11-15", note: "" },
+    ],
+    items: [
+      { id: "s1101pack", date: "2026-11-01", start: "11:00", end: "", kind: "aufgabe", title: "Für den Urlaub packen", note: "Koffer packen, Ladekabel, Nasenpflaster & Mundtapes einpacken", done: false },
+    ] },
+];
+
 async function sha(text) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("avanor:" + text));
   return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -64,6 +77,7 @@ export class Planner extends DurableObject {
       return json({ ok: true, created: !saved });
     }
 
+    await this.seed();
     const saved = await st.get("auth");
     if (!saved || saved !== (await sha(req.headers.get("x-key") || ""))) return json({ error: "Nicht angemeldet." }, 401);
 
@@ -133,6 +147,23 @@ export class Planner extends DurableObject {
     for (const [k, v] of await this.ctx.storage.list({ prefix: "doc:" })) out[k.slice(4)] = v;
     return out;
   }
+  async seed() {
+    const st = this.ctx.storage, done = (await st.get("seeds")) || [];
+    let changed = false;
+    for (const s of SEEDS.filter(s => !done.includes(s.id))) {
+      const away = (await st.get("doc:away")) || { list: [] };
+      for (const a of s.away || []) if (!away.list.some(x => x.id === a.id)) away.list.push(a);
+      await st.put("doc:away", away);
+      for (const it of s.items || []) {
+        const k = "doc:m-" + it.date.slice(0, 7), m = (await st.get(k)) || { items: {}, done: {} };
+        m.items = m.items || {};
+        if (!m.items[it.id]) m.items[it.id] = it;
+        await st.put(k, m);
+      }
+      done.push(s.id); changed = true;
+    }
+    if (changed) { await st.put("seeds", done); await this.changed(); }
+  }
   async tz() { return (await this.ctx.storage.get("tz")) || "Europe/Berlin"; }
   async vapid() {
     let v = await this.ctx.storage.get("vapid");
@@ -177,6 +208,7 @@ export class Planner extends DurableObject {
   // Fällige Mitteilungen verschicken; Fehler werden protokolliert, der Zeitplan läuft trotzdem weiter
   async tick() {
     const now = Date.now(), st = this.ctx.storage;
+    try { await this.seed(); } catch (e) { await this.log("Fehler", String((e && e.message) || e)); }
     try {
       const sent = (await st.get("sent")) || {};
       for (const n of (await this.queue()).filter(n => n.ts <= now + 20000)) {
