@@ -108,10 +108,9 @@ export function model(get,today){
       const body=!off?"Ich hoffe, Sie sind bereit für den Tag.":
         (off.type==="urlaub"?"Sie haben Urlaub! Ich wünsche Ihnen einen wunderschönen Tag mit Ihrer Prinzessin. Erholen Sie sich gut."
           :"Heute haben Sie frei! Ich wünsche Ihnen einen wunderschönen freien Tag mit Ihrer Prinzessin.")+(off.note?" "+off.note:"");
-      // Plan und offene ToDos direkt im Morgengruß
+      // Offene ToDos direkt im Morgengruß
       const bullets=(head,l)=>l.length?`\n\n${head}\n`+l.slice(0,10).map(x=>"• "+x).join("\n")+(l.length>10?`\n… und ${l.length-10} weitere`:""):"";
-      const list=bullets("Ihr Plan heute:",planTasks(s).map(x=>(x.time?x.time+" ":"")+x.title))
-        +bullets("Ihre ToDos:",todosOn(s).filter(t=>!t.done).map(t=>t.title+(t.from<s?" (offen seit "+(diffDays(t.from,s)===1?"gestern":diffDays(t.from,s)+" Tagen")+")":"")));
+      const list=bullets("Ihre ToDos:",todosOn(s).filter(t=>!t.done).map(t=>t.title+(t.from<s?" (offen seit "+(diffDays(t.from,s)===1?"gestern":diffDays(t.from,s)+" Tagen")+")":"")));
       out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body:body+list,btn:off?"Danke!":"Bereit!",until:mt+240});
       out.push({key:"quote-"+s,min:mt,title:"Ihr Spruch für heute",body:QUOTES[parse(s).getDate()-1],btn:"Danke!",until:mt+240})}
     supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
