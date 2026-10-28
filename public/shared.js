@@ -70,6 +70,9 @@ export function model(get,today){
   const ideas=()=>get("ideas",{list:DEFAULT_IDEAS}).list;
   const supply=()=>get("supply",{items:{}});
   // Freie Tage und Urlaub: {list:[{id,type:"frei"|"urlaub",from,to,note}]}
+  // ToDos ohne feste Uhrzeit: {list:[{id,title,from,doneOn}]}; unerledigt wandern sie jeden Tag weiter
+  const todos=()=>get("todos",{list:[]}).list;
+  const todosOn=s=>todos().filter(t=>t.from<=s&&(!t.doneOn||t.doneOn>=s)).map(t=>({...t,done:t.doneOn===s}));
   const away=()=>get("away",{list:[]}).list;
   const awayOn=s=>away().find(a=>a.from<=s&&s<=(a.to||a.from))||null;
   function settings(){const s=get("settings",{});return{
@@ -81,7 +84,10 @@ export function model(get,today){
   function routinesOn(s){const w=wday(s);return templates().filter(t=>t.active!==false&&(t.repeat==="daily"||(t.repeat==="weekly"&&(t.days||[]).includes(w))))}
   function planOn(s){const w=wday(s);return plan().filter(p=>(p.days||[]).includes(w))}
   function isDone(s,id){const d=month(s).done||{};return !!(d[s]&&d[s][id])}
-  function taskCount(s){const r=routinesOn(s),o=itemsOn(s).filter(i=>i.kind==="aufgabe");return{total:r.length+o.length,done:r.filter(t=>isDone(s,t.id)).length+o.filter(i=>i.done).length}}
+  // Tagesaufgaben stehen nur im Plan (ohne Abhaken), nach Uhrzeit
+  function planTasks(s){return[...routinesOn(s).map(t=>({id:t.id,routine:true,time:t.time||"",title:t.title,sub:t.repeat==="daily"?"täglich":"wöchentlich"})),
+    ...itemsOn(s).filter(i=>i.kind==="aufgabe").map(i=>({id:i.id,time:i.start||"",title:i.title,sub:"einmalig"}))].sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"))}
+  function taskCount(s){const t=todosOn(s);return{plan:planTasks(s).length,todo:t.length,open:t.filter(x=>!x.done).length}}
   function trainedOn(s){return planOn(s).some(p=>isDone(s,p.id))||itemsOn(s).some(i=>i.kind==="training")}
   function supplyState(it,ref=today()){
     const used=Math.max(0,diffDays(it.asOf,ref))*PER_NIGHT;
@@ -91,8 +97,8 @@ export function model(get,today){
   function supplyAlerts(ref=today()){const s=supply();return Object.entries(s.items).map(([k,it])=>({k,it,st:supplyState(it,ref)})).filter(x=>x.st.warn)}
   // Alles mit Uhrzeit an einem Tag: Einträge (ohne erledigte Aufgaben) und offene Vorlagen-Aufgaben
   function timed(s){const out=[];
-    itemsOn(s).filter(i=>i.start&&!(i.kind==="aufgabe"&&i.done)).forEach(i=>{const{a,b}=span(i);out.push({s,a,b,id:i.id,title:i.title,kind:i.kind,end:i.end})});
-    routinesOn(s).filter(t=>t.time&&!isDone(s,t.id)).forEach(t=>{const a=toMin(t.time);out.push({s,a,b:a+30,id:t.id,title:t.title,kind:"aufgabe",routine:true})});
+    itemsOn(s).filter(i=>i.start).forEach(i=>{const{a,b}=span(i);out.push({s,a,b,id:i.id,title:i.title,kind:i.kind,end:i.end})});
+    routinesOn(s).filter(t=>t.time).forEach(t=>{const a=toMin(t.time);out.push({s,a,b:a+30,id:t.id,title:t.title,kind:"aufgabe",routine:true})});
     return out.sort((x,y)=>x.a-y.a)}
   // Alle Mitteilungen eines Tages; min = Minute des Tages (kann vor 0 liegen)
   function notificationsFor(s){
@@ -102,11 +108,10 @@ export function model(get,today){
       const body=!off?"Ich hoffe, Sie sind bereit für den Tag.":
         (off.type==="urlaub"?"Sie haben Urlaub! Ich wünsche Ihnen einen wunderschönen Tag mit Ihrer Prinzessin. Erholen Sie sich gut."
           :"Heute haben Sie frei! Ich wünsche Ihnen einen wunderschönen freien Tag mit Ihrer Prinzessin.")+(off.note?" "+off.note:"");
-      // Tagesaufgaben direkt im Morgengruß, nach Uhrzeit
-      const todo=[...routinesOn(s).filter(t=>!isDone(s,t.id)).map(t=>({time:t.time||"",title:t.title})),
-        ...itemsOn(s).filter(i=>i.kind==="aufgabe"&&!i.done).map(i=>({time:i.start||"",title:i.title}))]
-        .sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"));
-      const list=todo.length?"\n\nIhre Aufgaben heute:\n"+todo.slice(0,10).map(x=>"• "+(x.time?x.time+" ":"")+x.title).join("\n")+(todo.length>10?`\n… und ${todo.length-10} weitere`:""):"";
+      // Plan und offene ToDos direkt im Morgengruß
+      const bullets=(head,l)=>l.length?`\n\n${head}\n`+l.slice(0,10).map(x=>"• "+x).join("\n")+(l.length>10?`\n… und ${l.length-10} weitere`:""):"";
+      const list=bullets("Ihr Plan heute:",planTasks(s).map(x=>(x.time?x.time+" ":"")+x.title))
+        +bullets("Ihre ToDos:",todosOn(s).filter(t=>!t.done).map(t=>t.title+(t.from<s?" (offen seit "+(diffDays(t.from,s)===1?"gestern":diffDays(t.from,s)+" Tagen")+")":"")));
       out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body:body+list,btn:off?"Danke!":"Bereit!",until:mt+240});
       out.push({key:"quote-"+s,min:mt,title:"Ihr Spruch für heute",body:QUOTES[parse(s).getDate()-1],btn:"Danke!",until:mt+240})}
     supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
@@ -130,5 +135,5 @@ export function model(get,today){
       if(last<1440)out.push({key:"evening-"+s,min:last,title:"Schönen Feierabend, Meister!",body:EVENING[parse(s).getDate()%EVENING.length],btn:"Danke!",until:last+120})}
     return out.sort((x,y)=>x.min-y.min);
   }
-  return{month,templates,plan,ideas,supply,away,awayOn,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
+  return{month,templates,plan,ideas,supply,todos,todosOn,planTasks,away,awayOn,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor};
 }

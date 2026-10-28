@@ -146,6 +146,7 @@ label.field{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:va
 .ct{flex:1;min-width:0;overflow-wrap:anywhere}
 .tt{flex:none;width:44px;font-variant-numeric:tabular-nums;font-weight:700;font-size:.9rem;color:var(--mint)}
 .check.done .tt{color:var(--muted)}
+.check.plain{cursor:pointer}
 .ct small{display:block;color:var(--muted);font-size:.8rem}
 .progress{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
 .progress span{display:block;height:100%;background:var(--mint);border-radius:99px;transition:width .3s}
@@ -290,7 +291,7 @@ const Store={docs:LS.get("tp-docs",{}),dirty:new Set(LS.get("tp-dirty",[])),busy
 };
 
 /* ---------- Daten ---------- */
-const {month,templates,plan,ideas,supply,away,awayOn,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor}=model((id,def)=>Store.get(id,def),today);
+const {month,templates,plan,ideas,supply,todos,todosOn,planTasks,away,awayOn,settings,itemsOn,routinesOn,planOn,isDone,taskCount,trainedOn,supplyState,supplyAlerts,timed,notificationsFor}=model((id,def)=>Store.get(id,def),today);
 function saveItem(it){const k=mkey(it.date);const m=month(it.date);m.items=m.items||{};m.items[it.id]=it;Store.put(k,m)}
 function deleteItem(it){const k=mkey(it.date);const m=month(it.date);delete m.items[it.id];Store.put(k,m)}
 function toggleDone(s,id){const k=mkey(s);const m=month(s);m.done=m.done||{};m.done[s]=m.done[s]||{};if(m.done[s][id])delete m.done[s][id];else m.done[s][id]=true;Store.put(k,m)}
@@ -432,7 +433,7 @@ function settingsSheet(){
       <div>${away().filter(a=>(a.to||a.from)>=today()).sort((x,y)=>x.from.localeCompare(y.from)).map(a=>`<div class="awayrow"><span><b>${AWAY[a.type]||"Frei"}</b> · ${esc(fmt(a.from,{day:"numeric",month:"short"}))}${a.to&&a.to!==a.from?" – "+esc(fmt(a.to,{day:"numeric",month:"short"})):""}${a.note?`<br><small class="muted">${esc(a.note)}</small>`:""}</span><button type="button" class="btn ghost small" data-act="delaway" data-id="${a.id}">Löschen</button></div>`).join("")||'<span class="muted">Nichts eingetragen.</span>'}</div>
       <label class="field"><span>Art</span><select id="a-type"><option value="frei">Freier Tag</option><option value="urlaub">Urlaub</option></select></label>
       <div class="row"><label class="field" style="flex:1"><span>Von</span><input type="date" id="a-from"></label><label class="field" style="flex:1"><span>Bis</span><input type="date" id="a-to"></label></div>
-      <label class="field"><span>Notiz für den Morgengruß (optional)</span><input id="a-note" maxlength="140"></label>
+      <label class="field"><span>Notiz für den Morgengruß (optional)</span><input type="text" id="a-note" maxlength="140"></label>
       <button type="button" class="btn" data-act="addaway">Eintragen</button></div>
     <details class="set"><summary><b>Daten aus der alten App übernehmen</b></summary>
       <div class="stack" style="margin-top:10px"><p class="muted" style="font-size:.88rem">Öffnen Sie die alte App bei Claude, tippen Sie dort im Zahnrad auf „Daten kopieren“ und fügen Sie den Text hier ein.</p>
@@ -481,7 +482,7 @@ function vHome(){
   <div class="quote"><p>${esc(q)}</p><small>Spruch zum ${parse(s).getDate()}.</small></div>
   <nav class="tiles" aria-label="Bereiche">
     <button class="tile" data-act="go" data-p="kalender">${ICON.kalender}<div><b>Kalender</b><span>${work?`Arbeit ${esc(work.start)}${work.end?"–"+esc(work.end):""}`:appts.length?`${appts.length} ${appts.length===1?"Eintrag":"Einträge"} heute`:awayOn(s)?(awayOn(s).type==="urlaub"?"Urlaub":"Heute frei"):"Heute frei"}</span></div></button>
-    <button class="tile" data-act="go" data-p="aufgaben">${ICON.aufgaben}<div><b>Tagesaufgaben</b><span>${tc.total?`${tc.done} von ${tc.total} erledigt`:"Noch keine Aufgaben"}</span></div></button>
+    <button class="tile" data-act="go" data-p="aufgaben">${ICON.aufgaben}<div><b>Tagesaufgaben</b><span>${tc.open?`${tc.open} ${tc.open===1?"ToDo":"ToDos"} offen`:tc.todo?"ToDos erledigt ✓":"Keine ToDos"}${tc.plan?` · ${tc.plan} im Plan`:""}</span></div></button>
     <button class="tile" data-act="go" data-p="training">${ICON.training}<div><b>Training</b><span>${trainedOn(s)?"Heute erledigt ✓":pl.length?"Heute: "+esc(pl.map(p=>p.title).join(", ")):"Heute Ruhetag"}</span></div></button>
     <button class="tile ${alerts.length?"warn":""}" data-act="go" data-p="vorrat">${ICON.vorrat}<div><b>Nasenpflaster &amp; Mundtapes</b><span>${supTxt}</span></div></button>
   </nav>
@@ -496,24 +497,28 @@ function itemHtml(i){return `<button class="item ${i.kind}" data-act="edit" data
   <span class="kind ${i.kind}">${KIND[i.kind]}</span></button>`}
 
 function tasksHtml(s){
-  const r=routinesOn(s), once=itemsOn(s).filter(i=>i.kind==="aufgabe"), {total,done}=taskCount(s);
-  // Eine Liste nach Uhrzeit, Aufgaben ohne Uhrzeit am Ende
-  const rows=[...r.map(t=>({id:t.id,act:"routine",title:t.title,time:t.time||"",done:isDone(s,t.id),sub:t.repeat==="daily"?"täglich":"wöchentlich"})),
-    ...once.map(i=>({id:i.id,act:"once",title:i.title,time:i.start||"",done:!!i.done,sub:"einmalig"}))]
-    .sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"));
-  if(!total)return `<div class="empty">Keine Aufgaben für diesen Tag. Legen Sie unten Vorlagen an, die täglich oder wöchentlich wiederkommen, dann tauchen sie hier von selbst auf.</div>`;
-  return `<div class="row between"><span class="muted">${done} von ${total} erledigt</span>${done===total?'<span style="color:var(--mint);font-weight:700">Alles geschafft!</span>':""}</div>
-  <div class="progress"><span style="width:${Math.round(done/total*100)}%"></span></div>
-  <div class="card" style="padding:2px 14px">${rows.map(x=>`<button class="check ${x.done?"done":""}" data-act="${x.act}" data-id="${x.id}" data-date="${s}">
-    <span class="box">✓</span><span class="tt">${x.time?esc(x.time):"–"}</span><span class="ct">${esc(x.title)}<small>${x.sub}</small></span></button>`).join("")}</div>`;
+  const rows=planTasks(s);
+  if(!rows.length)return `<div class="empty">Für diesen Tag steht keine Aufgabe im Plan. Legen Sie unten Vorlagen an, die täglich oder wöchentlich wiederkommen, dann tauchen sie hier von selbst auf.</div>`;
+  return `<div class="card" style="padding:2px 14px">${rows.map(x=>`<button class="check plain" data-act="${x.routine?"tpl":"edit"}" data-id="${x.id}" data-date="${s}">
+    <span class="tt">${x.time?esc(x.time):"–"}</span><span class="ct">${esc(x.title)}<small>${x.sub}</small></span></button>`).join("")}</div>`;
+}
+const since=(t,s)=>{const n=diffDays(t.from,s);return n<=0?"":n===1?"seit gestern offen":`seit ${n} Tagen offen`};
+function todosHtml(s){
+  const l=todosOn(s).sort((x,y)=>(x.done-y.done)||x.from.localeCompare(y.from)), open=l.filter(t=>!t.done).length;
+  return `<form class="row" data-form="todo" data-date="${s}" style="gap:8px"><input type="text" id="todo-new" placeholder="Neues ToDo, z. B. Paket abholen" maxlength="120" style="flex:1" autocomplete="off"><button class="btn primary small">Hinzufügen</button></form>
+  ${l.length?`<div class="row between"><span class="muted">${open?`${open} offen`:"Alles erledigt!"}</span><span class="muted" style="font-size:.82rem">Unerledigtes wandert automatisch in den nächsten Tag.</span></div>
+  <div class="card" style="padding:2px 14px">${l.map(t=>`<div class="row" style="gap:6px;align-items:center"><button class="check ${t.done?"done":""}" data-act="todo" data-id="${t.id}" data-date="${s}" style="flex:1">
+    <span class="box">✓</span><span class="ct">${esc(t.title)}${since(t,s)&&!t.done?`<small>${since(t,s)}</small>`:""}</span></button>
+    <button class="btn ghost small" data-act="deltodo" data-id="${t.id}" aria-label="ToDo löschen">✕</button></div>`).join("")}</div>`
+  :`<div class="empty">Keine ToDos. Alles, was heute erledigt werden muss, aber keine feste Uhrzeit hat, tragen Sie hier ein.</div>`}`;
 }
 
 function timelineHtml(s){
   const HH=52, bl=[];
   itemsOn(s).filter(i=>i.start).forEach(i=>{const{a,b}=span(i);
-    bl.push({a,b,kind:i.kind,title:i.title,sub:`${i.start}${i.end?"–"+i.end:""}${i.kind==="arbeit"&&i.end?" · "+dur(b-a):""}${i.note?" · "+i.note:""}`,act:i.kind==="aufgabe"?"edit":"edit",id:i.id,done:i.kind==="aufgabe"&&i.done})});
+    bl.push({a,b,kind:i.kind,title:i.title,sub:`${i.start}${i.end?"–"+i.end:""}${i.kind==="arbeit"&&i.end?" · "+dur(b-a):""}${i.note?" · "+i.note:""}`,act:"edit",id:i.id,done:false})});
   routinesOn(s).filter(t=>t.time).forEach(t=>{const a=toMin(t.time);
-    bl.push({a,b:Math.min(a+30,1440),kind:"aufgabe",title:t.title,sub:`${t.time} · ${t.repeat==="daily"?"täglich":"wöchentlich"} · antippen zum Abhaken`,act:"routine",id:t.id,done:isDone(s,t.id)})});
+    bl.push({a,b:Math.min(a+30,1440),kind:"aufgabe",title:t.title,sub:`${t.time} · ${t.repeat==="daily"?"täglich":"wöchentlich"}`,act:"tpl",id:t.id,done:false})});
   bl.sort((x,y)=>x.a-y.a||y.b-x.b);
   // Überlappende Einträge nebeneinander in Spalten
   const clusters=[];let cur=[],end=-1;
@@ -547,10 +552,10 @@ function vKalender(){
     <div class="row muted" style="font-size:.8rem;gap:12px">${Object.entries(KIND).map(([k,l])=>`<span class="row" style="gap:5px"><span class="dots"><i class="${k}"></i></span>${l}</span>`).join("")}${ui.cal!==t.slice(0,7)||ui.sel!==t?`<button class="btn ghost small" data-act="gotoday">Zu heute</button>`:""}</div></section>
   <section id="dayview"><div class="row between"><div class="daynav"><button class="btn small" data-act="day" data-d="-1" aria-label="Vortag">‹</button><h2>${esc(fmt(s,{weekday:"short",day:"numeric",month:"long"}))}</h2><button class="btn small" data-act="day" data-d="1" aria-label="Nächster Tag">›</button></div><button class="btn primary small" data-act="new" data-date="${s}">+ Eintrag</button></div>
     ${offdayHtml(s)}
-    <div class="sum">${workMin?`<span>Arbeit <b>${dur(workMin)}</b></span>`:""}<span><b>${items.filter(i=>i.kind!=="aufgabe").length}</b> Einträge</span>${tc.total?`<span>Aufgaben <b>${tc.done}/${tc.total}</b></span>`:""}${pl.length?`<span>Training: <b>${esc(pl.map(p=>p.title).join(", "))}</b></span>`:""}</div>
+    <div class="sum">${workMin?`<span>Arbeit <b>${dur(workMin)}</b></span>`:""}<span><b>${items.filter(i=>i.kind!=="aufgabe").length}</b> Einträge</span>${tc.plan?`<span>Aufgaben <b>${tc.plan}</b></span>`:""}${tc.todo?`<span>ToDos <b>${tc.todo-tc.open}/${tc.todo}</b></span>`:""}${pl.length?`<span>Training: <b>${esc(pl.map(p=>p.title).join(", "))}</b></span>`:""}</div>
     ${untimed.length||rUntimed.length?`<div class="stack" style="gap:6px"><span class="eyebrow">Ohne Uhrzeit</span>
       ${untimed.length?`<div class="items">${untimed.map(itemHtml).join("")}</div>`:""}
-      ${rUntimed.length?`<div class="card" style="padding:2px 14px">${rUntimed.map(t=>`<button class="check ${isDone(s,t.id)?"done":""}" data-act="routine" data-id="${t.id}" data-date="${s}"><span class="box">✓</span><span class="ct">${esc(t.title)}<small>${t.repeat==="daily"?"täglich":"wöchentlich"}</small></span></button>`).join("")}</div>`:""}</div>`:""}
+      ${rUntimed.length?`<div class="card" style="padding:2px 14px">${rUntimed.map(t=>`<button class="check plain" data-act="tpl" data-id="${t.id}" data-date="${s}"><span class="ct">${esc(t.title)}<small>${t.repeat==="daily"?"täglich":"wöchentlich"}</small></span></button>`).join("")}</div>`:""}</div>`:""}
     ${timelineHtml(s)}
     <p class="muted" style="font-size:.82rem">Tipp: Tippen Sie auf eine freie Stunde, um dort direkt etwas einzutragen.</p>
     ${hasFree?"":`<div class="card stack"><span class="eyebrow">Freizeit blocken</span><span>Lust auf etwas davon?</span>
@@ -566,8 +571,9 @@ function vAufgaben(){
   const group=(rep,title,hint)=>{const g=list.filter(t=>t.repeat===rep).sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"));return `<div class="card stack" style="gap:2px"><div class="row between"><h3>${title}</h3><span class="muted" style="font-size:.82rem">${hint}</span></div>
     ${g.length?g.map(t=>`<div class="list-row"><span class="t" style="${t.active===false?"opacity:.5":""}">${esc(t.title)}<br><small class="muted">${rep==="weekly"?[...(t.days||[])].sort().map(d=>WD[d-1]).join(", "):""}${t.time?(rep==="weekly"?" · ":"")+esc(t.time):""}${t.active===false?" · pausiert":""}</small></span>
       <button class="btn small" data-act="tpl" data-id="${t.id}">Bearbeiten</button></div>`).join(""):`<p class="muted" style="margin:6px 0">Noch keine.</p>`}</div>`};
-  return `<section><div class="row between"><h2>Heute</h2><div class="row" style="gap:6px"><button class="btn small" data-act="fromtpl" data-date="${s}">Aus Vorlage</button><button class="btn primary small" data-act="new" data-date="${s}" data-kind="aufgabe">+ Aufgabe</button></div></div>
+  return `<section><div class="row between"><h2>Heute im Plan</h2><div class="row" style="gap:6px"><button class="btn small" data-act="fromtpl" data-date="${s}">Aus Vorlage</button><button class="btn primary small" data-act="new" data-date="${s}" data-kind="aufgabe">+ Aufgabe</button></div></div>
     ${tasksHtml(s)}</section>
+  <section><h2>ToDos</h2>${todosHtml(s)}</section>
   <section><div class="row between"><h2>Vorlagen</h2><button class="btn small" data-act="tpl">+ Vorlage</button></div>
     <p class="muted">Tägliche und wöchentliche Vorlagen erscheinen automatisch an den passenden Tagen. Gemerkte Vorlagen holen Sie sich bei Bedarf mit „Aus Vorlage“.</p>
     ${group("daily","Täglich","jeden Tag")}${group("weekly","Wöchentlich","feste Wochentage")}${group("none","Gemerkt","zum Auswählen")}</section>`;
@@ -687,6 +693,8 @@ document.addEventListener("click",e=>{
   else if(a==="moreideas"){syncDraft();ideaSeed++;entrySheet(draft)}
   else if(a==="delentry"){if(!confirmDel){confirmDel=true;b.textContent="Wirklich löschen?";return}deleteItem(draft);closeSheet();toast("Gelöscht")}
   else if(a==="routine")toggleDone(d.date,d.id);
+  else if(a==="todo"){const l=todos();const t=l.find(x=>x.id===d.id);if(t){t.doneOn=t.doneOn?null:d.date;Store.put("todos",{list:l})}}
+  else if(a==="deltodo"){Store.put("todos",{list:todos().filter(x=>x.id!==d.id)})}
   else if(a==="once"){const it=month(d.date).items[d.id];if(it){it.done=!it.done;saveItem(it)}}
   else if(a==="fromtpl")pickSheet(d.date);
   else if(a==="usetpl"){const t=templates().find(x=>x.id===d.id);if(t){saveItem(Object.assign(newItem(d.date,"aufgabe",t.title),{start:t.time||"",done:false}));closeSheet();toast("Eingetragen")}}
@@ -729,6 +737,10 @@ document.addEventListener("submit",e=>{
       evening:{on:$("#s-eon").checked,time:$("#s-etime").value||"22:00"},
       work:{on:$("#s-won").checked,before:Math.max(1,Math.min(180,parseInt($("#s-wbefore").value,10)||20)),prep:Math.max(0,Math.min(240,parseInt($("#s-wprep").value,10)||0))}});
     closeSheet();toast("Einstellungen gespeichert");checkReminders()}
+  else if(f.dataset.form==="todo"){const v=$("#todo-new").value.trim();if(v){
+    // Alte Erledigte nach 30 Tagen aufräumen
+    const old=addDays(today(),-30);Store.put("todos",{list:[...todos().filter(t=>!t.doneOn||t.doneOn>=old),{id:nid(),title:v,from:f.dataset.date||today(),doneOn:null}]});
+    const i=$("#todo-new");if(i)i.focus()}}
   else if(f.dataset.form==="idea"){const v=$("#newIdea").value.trim();if(v)Store.put("ideas",{list:[...ideas(),v]})}
   else if(f.dataset.form==="setup"){const n=parseInt($("#setup-"+k).value,10);if(n>=0){const s=supply();s.items[k]={label:SUPPLY_DEF[k],count:n,asOf:today(),ordered:false};Store.put("supply",s)}}
   else if(f.dataset.form==="delivery"){const n=parseInt($("#del-"+k).value,10);if(n>0){const s=supply();const st=supplyState(s.items[k]);Object.assign(s.items[k],{count:st.left+n,asOf:today(),ordered:false});Store.put("supply",s);toast(`+${n} eingetragen`)}}
