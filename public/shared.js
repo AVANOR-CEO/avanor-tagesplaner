@@ -102,7 +102,12 @@ export function model(get,today){
       const body=!off?"Ich hoffe, Sie sind bereit für den Tag.":
         (off.type==="urlaub"?"Sie haben Urlaub! Ich wünsche Ihnen einen wunderschönen Tag mit Ihrer Prinzessin. Erholen Sie sich gut."
           :"Heute haben Sie frei! Ich wünsche Ihnen einen wunderschönen freien Tag mit Ihrer Prinzessin.")+(off.note?" "+off.note:"");
-      out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body,btn:off?"Danke!":"Bereit!",until:mt+240});
+      // Tagesaufgaben direkt im Morgengruß, nach Uhrzeit
+      const todo=[...routinesOn(s).filter(t=>!isDone(s,t.id)).map(t=>({time:t.time||"",title:t.title})),
+        ...itemsOn(s).filter(i=>i.kind==="aufgabe"&&!i.done).map(i=>({time:i.start||"",title:i.title}))]
+        .sort((x,y)=>(x.time||"99").localeCompare(y.time||"99"));
+      const list=todo.length?"\n\nIhre Aufgaben heute:\n"+todo.slice(0,10).map(x=>"• "+(x.time?x.time+" ":"")+x.title).join("\n")+(todo.length>10?`\n… und ${todo.length-10} weitere`:""):"";
+      out.push({key:"morning-"+s,min:mt,title:"Guten Morgen, Meister!",body:body+list,btn:off?"Danke!":"Bereit!",until:mt+240});
       out.push({key:"quote-"+s,min:mt,title:"Ihr Spruch für heute",body:QUOTES[parse(s).getDate()-1],btn:"Danke!",until:mt+240})}
     supplyAlerts(s).forEach(({k,it,st:x})=>out.push({key:`supply-${k}-${s}`,min:mt+1,title:`Meister, Sie müssen ${it.label} nachbestellen!`,
       body:x.nights===0?"Sie haben keine mehr übrig.":`Noch ${x.left} Stück. Tippen Sie in der App auf „Ich habe bestellt“, dann ist Ruhe.`,btn:"Okay",until:mt+240}));
